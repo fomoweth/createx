@@ -1,0 +1,51 @@
+[profile.default]
+solc = "0.8.30"
+evm_version = "cancun"
+gas_limit = "300000000"
+bytecode_hash = "none"
+cbor_metadata = false
+dynamic_test_linking = true
+ffi = true
+optimizer = true
+optimizer_runs = 44444444
+via_ir = true
+fs_permissions = [
+    { access = "read", path = "./config"},
+    { access = "read", path = "./out"},
+	{ access = "read", path = "./script" },
+    { access = "read", path = "./test"}
+]
+
+[fuzz]
+runs = 1000
+max_test_rejects = 20000
+
+[rpc_endpoints]
+ethereum = "${RPC_ETHEREUM}"
+sepolia = "${RPC_SEPOLIA}"
+optimism = "${RPC_OPTIMISM}"
+optimism-sepolia = "${RPC_OPTIMISM_SEPOLIA}"
+polygon = "${RPC_POLYGON}"
+polygon-amoy = "${RPC_POLYGON_AMOY}"
+base = "${RPC_BASE}"
+base-sepolia = "${RPC_BASE_SEPOLIA}"
+arbitrum = "${RPC_ARBITRUM}"
+arbitrum-sepolia = "${RPC_ARBITRUM_SEPOLIA}"
+avalanche = "${RPC_AVALANCHE}"
+avalanche-fuji = "${RPC_AVALANCHE_FUJI}"
+
+[etherscan]
+ethereum = { key = "${ETHERSCAN_API_KEY}", chainId = 1 }
+sepolia = { key = "${ETHERSCAN_API_KEY}", chainId = 11155111 }
+optimism = { key = "${ETHERSCAN_API_KEY}", chainId = 10 }
+optimism-sepolia = { key = "${ETHERSCAN_API_KEY}", chainId = 11155420 }
+polygon = { key = "${ETHERSCAN_API_KEY}", chainId = 137 }
+polygon-amoy = { key = "${ETHERSCAN_API_KEY}", chainId = 80002 }
+base = { key = "${ETHERSCAN_API_KEY}", chainId = 8453 }
+base-sepolia = { key = "${ETHERSCAN_API_KEY}", chainId = 84532 }
+arbitrum = { key = "${ETHERSCAN_API_KEY}", chainId = 42161 }
+arbitrum-sepolia = { key = "${ETHERSCAN_API_KEY}", chainId = 421614 }
+avalanche = { key = "${ETHERSCAN_API_KEY}", chainId = 43114 }
+avalanche-fuji = { key = "${ETHERSCAN_API_KEY}", chainId = 43113 }
+
+# See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
