@@ -1,0 +1,12 @@
+{
+	"address": "0xaeE0e8254d6AAA8335c575FBfB0cb39AFcdae0bF",
+	"block": 8685367,
+	"chain": {
+		"alias": "sepolia",
+		"id": 11155111,
+		"name": "Sepolia"
+	},
+	"deployer": "0xFcF506c3fd32F158D6Aa4e112eE4fA27fFed4e1C",
+	"salt": "0x0000000000000000000000000000000000000000000000000000000000197579",
+	"timestamp": 1751571012
+}
