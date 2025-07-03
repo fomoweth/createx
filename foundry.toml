@@ -10,42 +10,63 @@ optimizer = true
 optimizer_runs = 44444444
 via_ir = true
 fs_permissions = [
-    { access = "read", path = "./config"},
+    { access = "read-write", path = "./deployments"},
     { access = "read", path = "./out"},
 	{ access = "read", path = "./script" },
     { access = "read", path = "./test"}
 ]
+gas_reports = ["CreateXFactory"]
 
 [fuzz]
 runs = 1000
-max_test_rejects = 20000
+max_test_rejects = 1000000
+
+[invariant]
+runs = 1000
+depth = 50
 
 [rpc_endpoints]
-ethereum = "${RPC_ETHEREUM}"
-sepolia = "${RPC_SEPOLIA}"
-optimism = "${RPC_OPTIMISM}"
-optimism-sepolia = "${RPC_OPTIMISM_SEPOLIA}"
-polygon = "${RPC_POLYGON}"
-polygon-amoy = "${RPC_POLYGON_AMOY}"
-base = "${RPC_BASE}"
-base-sepolia = "${RPC_BASE_SEPOLIA}"
-arbitrum = "${RPC_ARBITRUM}"
-arbitrum-sepolia = "${RPC_ARBITRUM_SEPOLIA}"
-avalanche = "${RPC_AVALANCHE}"
-avalanche-fuji = "${RPC_AVALANCHE_FUJI}"
+ethereum = "${ETHEREUM_RPC_URL}"
+sepolia = "${SEPOLIA_RPC_URL}"
+optimism = "${OPTIMISM_RPC_URL}"
+optimism-sepolia = "${OPTIMISM_SEPOLIA_RPC_URL}"
+bnb = "${BNB_RPC_URL}"
+bnb-testnet = "${BNB_TESTNET_RPC_URL}"
+unichain = "${UNICHAIN_RPC_URL}"
+unichain-sepolia = "${UNICHAIN_SEPOLIA_RPC_URL}"
+polygon = "${POLYGON_RPC_URL}"
+polygon-amoy = "${POLYGON_AMOY_RPC_URL}"
+fantom = "${FANTOM_RPC_URL}"
+fantom-testnet = "${FANTOM_TESTNET_RPC_URL}"
+base = "${BASE_RPC_URL}"
+base-sepolia = "${BASE_SEPOLIA_RPC_URL}"
+arbitrum = "${ARBITRUM_RPC_URL}"
+arbitrum-sepolia = "${ARBITRUM_SEPOLIA_RPC_URL}"
+avalanche = "${AVALANCHE_RPC_URL}"
+avalanche-fuji = "${AVALANCHE_FUJI_RPC_URL}"
+linea = "${LINEA_RPC_URL}"
+linea-sepolia = "${LINEA_SEPOLIA_RPC_URL}"
 
 [etherscan]
 ethereum = { key = "${ETHERSCAN_API_KEY}", chainId = 1 }
 sepolia = { key = "${ETHERSCAN_API_KEY}", chainId = 11155111 }
 optimism = { key = "${ETHERSCAN_API_KEY}", chainId = 10 }
 optimism-sepolia = { key = "${ETHERSCAN_API_KEY}", chainId = 11155420 }
+bnb = { key = "${ETHERSCAN_API_KEY}", chainId = 56 }
+bnb-testnet = { key = "${ETHERSCAN_API_KEY}", chainId = 97 }
+unichain = { key = "${ETHERSCAN_API_KEY}", chainId = 130 }
+unichain-sepolia = { key = "${ETHERSCAN_API_KEY}", chainId = 1301 }
 polygon = { key = "${ETHERSCAN_API_KEY}", chainId = 137 }
 polygon-amoy = { key = "${ETHERSCAN_API_KEY}", chainId = 80002 }
+fantom = { key = "${ETHERSCAN_API_KEY}", chainId = 250 }
+fantom-testnet = { key = "${ETHERSCAN_API_KEY}", chainId = 4002 }
 base = { key = "${ETHERSCAN_API_KEY}", chainId = 8453 }
 base-sepolia = { key = "${ETHERSCAN_API_KEY}", chainId = 84532 }
 arbitrum = { key = "${ETHERSCAN_API_KEY}", chainId = 42161 }
 arbitrum-sepolia = { key = "${ETHERSCAN_API_KEY}", chainId = 421614 }
 avalanche = { key = "${ETHERSCAN_API_KEY}", chainId = 43114 }
 avalanche-fuji = { key = "${ETHERSCAN_API_KEY}", chainId = 43113 }
+linea = { key = "${ETHERSCAN_API_KEY}", chainId = 59144 }
+linea-sepolia = { key = "${ETHERSCAN_API_KEY}", chainId = 59141 }
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options

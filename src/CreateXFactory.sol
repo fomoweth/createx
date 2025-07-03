@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
-import {ICreateXFactory} from "src/interfaces/ICreateXFactory.sol";
+import {ICreateXFactory} from "./ICreateXFactory.sol";
 import {CreateX} from "./CreateX.sol";
 
 /// @title CreateXFactory
