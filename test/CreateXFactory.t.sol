@@ -3,8 +3,8 @@ pragma solidity ^0.8.30;
 
 import {CreateXFactory, ICreateXFactory} from "src/CreateXFactory.sol";
 import {CreateX} from "src/CreateX.sol";
-import {MockERC20} from "test/mocks/MockERC20.sol";
-import {MockTarget} from "test/mocks/MockTarget.sol";
+import {MockERC20} from "test/shared/mocks/MockERC20.sol";
+import {MockTarget} from "test/shared/mocks/MockTarget.sol";
 import {BaseTest} from "test/shared/BaseTest.sol";
 
 contract CreateXFactoryTest is BaseTest {
