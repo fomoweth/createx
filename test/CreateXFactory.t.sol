@@ -303,7 +303,7 @@ contract CreateXFactoryTest is BaseTest {
 		assertEq(token.decimals(), 18);
 	}
 
-	function test_deployCreate3ChainAgnosticDeployment() public impersonate(user) {
+	function test_deployCreate3ChainAgnosticDeployment() internal impersonate(user) {
 		bytes32 salt = processSalt(encodeSalt(user, MODE_RAW, GUARD_NONE, 0));
 		bytes memory initCode = bytes.concat(type(MockERC20).creationCode, abi.encode("Mock Token", "MOCK", 18));
 
