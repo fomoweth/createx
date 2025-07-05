@@ -10,14 +10,14 @@ abstract contract BaseTest is Test {
 	uint256 internal constant CREATION_TYPE_CLONE = 3;
 	uint256 internal constant CREATION_TYPE_CLONE_DETERMINISTIC = 4;
 
-	uint256 internal constant MODE_RAW = 0;
-	uint256 internal constant MODE_GUARDED = 1;
-	uint256 internal constant MODE_STRICT = 2;
+	uint8 internal constant MODE_RAW = 0;
+	uint8 internal constant MODE_GUARDED = 1;
+	uint8 internal constant MODE_STRICT = 2;
 
-	uint256 internal constant GUARD_NONE = 0;
-	uint256 internal constant GUARD_CALLER = 1;
-	uint256 internal constant GUARD_CHAIN = 2;
-	uint256 internal constant GUARD_CALLER_AND_CHAIN = 3;
+	uint8 internal constant GUARD_NONE = 0;
+	uint8 internal constant GUARD_CALLER = 1;
+	uint8 internal constant GUARD_CHAIN = 2;
+	uint8 internal constant GUARD_CALLER_AND_CHAIN = 3;
 
 	uint256 internal snapshotId = type(uint256).max;
 
@@ -25,6 +25,11 @@ abstract contract BaseTest is Test {
 		vm.startPrank(account);
 		_;
 		vm.stopPrank();
+	}
+
+	function revertToState() internal virtual {
+		if (snapshotId != type(uint256).max) vm.revertToState(snapshotId);
+		snapshotId = vm.snapshotState();
 	}
 
 	function createAccounts(
@@ -51,9 +56,73 @@ abstract contract BaseTest is Test {
 		return createAccount(key, 0);
 	}
 
-	function revertToState() internal virtual {
-		if (snapshotId != type(uint256).max) vm.revertToState(snapshotId);
-		snapshotId = vm.snapshotState();
+	function generateSalt(address sender) internal virtual returns (bytes32 salt) {
+		return generateSalt(sender, uint80(vm.randomUint(0, type(uint80).max)));
+	}
+
+	function generateSalt(address sender, uint80 identifier) internal virtual returns (bytes32 salt) {
+		return
+			generateSalt(
+				sender,
+				uint8(vm.randomUint(MODE_RAW, MODE_STRICT)),
+				uint8(vm.randomUint(GUARD_NONE, GUARD_CALLER_AND_CHAIN)),
+				identifier
+			);
+	}
+
+	function generateSalt(
+		address sender,
+		uint8 mode,
+		uint8 guard,
+		uint80 identifier
+	) internal pure virtual returns (bytes32 salt) {
+		mode = uint8(bound(mode, MODE_RAW, MODE_STRICT));
+
+		if (mode == MODE_RAW) {
+			guard = GUARD_NONE;
+		} else if (mode == MODE_GUARDED) {
+			guard = uint8(bound(guard, GUARD_CALLER, GUARD_CALLER_AND_CHAIN));
+		} else {
+			guard = uint8(bound(guard, GUARD_NONE, GUARD_CALLER_AND_CHAIN));
+		}
+
+		return encodeSalt(sender, mode, guard, identifier);
+	}
+
+	function encodeSalt(
+		address sender,
+		uint8 mode,
+		uint8 guard,
+		uint80 identifier
+	) internal pure virtual returns (bytes32 salt) {
+		return bytes32(abi.encodePacked(sender, identifier, guard, mode));
+	}
+
+	function processSalt(bytes32 original) internal view virtual returns (bytes32 salt) {
+		return processSalt(original, address(bytes20(original)));
+	}
+
+	function processSalt(bytes32 original, address msgSender) internal view virtual returns (bytes32 salt) {
+		return processSalt(uint8(bytes1(original[31])), uint8(bytes1(original[30])), original, msgSender);
+	}
+
+	function processSalt(
+		uint8 mode,
+		uint8 guard,
+		bytes32 original,
+		address msgSender
+	) internal view virtual returns (bytes32 salt) {
+		if (mode != MODE_RAW) {
+			if (guard == GUARD_CALLER) {
+				return keccak256(abi.encode(msgSender, original));
+			} else if (guard == GUARD_CHAIN) {
+				return keccak256(abi.encode(block.chainid, original));
+			} else if (guard == GUARD_CALLER_AND_CHAIN) {
+				return keccak256(abi.encode(msgSender, block.chainid, original));
+			}
+		}
+
+		return original;
 	}
 
 	function computeCreate2Address(
@@ -88,45 +157,7 @@ abstract contract BaseTest is Test {
 		return computeCreate2Address(deployer, initCodeHash, salt);
 	}
 
-	function encodeSalt(
-		uint256 mode,
-		uint256 guard,
-		uint256 identifier,
-		address sender
-	) internal pure virtual returns (bytes32 salt) {
-		return bytes32(abi.encodePacked(sender, uint80(identifier), uint8(guard), uint8(mode)));
-	}
-
-	function encodeSalt(address sender, uint80 identifier) internal pure virtual returns (bytes32 salt) {
-		return bytes32(abi.encodePacked(sender, identifier, GUARD_NONE, sender != address(0) ? MODE_STRICT : MODE_RAW));
-	}
-
-	function processSalt(
-		uint8 mode,
-		uint8 guard,
-		bytes32 original,
-		address sender
-	) internal view virtual returns (bytes32 salt) {
-		if (mode != MODE_RAW) {
-			if (guard == GUARD_CALLER) {
-				return keccak256(abi.encode(sender, original));
-			} else if (guard == GUARD_CHAIN) {
-				return keccak256(abi.encode(block.chainid, original));
-			} else if (guard == GUARD_CALLER_AND_CHAIN) {
-				return keccak256(abi.encode(sender, block.chainid, original));
-			}
-		}
-
-		return original;
-	}
-
 	function encodePrivateKey(string memory name) internal pure virtual returns (uint256 privateKey) {
 		return boundPrivateKey(uint256(keccak256(abi.encodePacked(name))));
-	}
-
-	function isContract(address target) internal view virtual returns (bool result) {
-		assembly ("memory-safe") {
-			result := iszero(iszero(extcodesize(target)))
-		}
 	}
 }
