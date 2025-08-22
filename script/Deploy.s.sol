@@ -7,67 +7,55 @@ import {CreateXFactory} from "src/CreateXFactory.sol";
 contract Deploy is Script {
 	using stdJson for string;
 
-	string internal constant TEST_MNEMONIC = "test test test test test test test test test test test junk";
+	string private constant DEFAULT_MNEMONIC = "test test test test test test test test test test test junk";
+	bytes32 private constant DEFAULT_SALT = 0x0000000000000000000000000000000000000000000000000000000000000000;
 
-	modifier broadcast(string memory chainAlias, address broadcaster) {
+	address internal broadcaster;
+	bytes32 internal salt;
+
+	modifier broadcast(string memory chainAlias) {
 		vm.createSelectFork(chainAlias);
 		vm.startBroadcast(broadcaster);
 		_;
 		vm.stopBroadcast();
 	}
 
-	function run() external {
-		address deployer = configureBroadcaster();
-		bytes32 salt = vm.envBytes32("SALT");
-
-		string[] memory chains = vm.envString("CHAINS", ",");
-
-		for (uint256 i; i < chains.length; ++i) {
-			deployToChain(chains[i], deployer, salt);
-		}
-	}
-
-	function deployToChain(
-		string memory chainAlias,
-		address deployer,
-		bytes32 salt
-	) internal broadcast(chainAlias, deployer) {
-		Chain memory chain = getChain(block.chainid);
-		string memory path = string.concat("./deployments/", vm.toString(chain.chainId), ".json");
-
-		console.log("======================================================================");
-		console.log("Deploying on:", chain.name);
-
-		CreateXFactory createXFactory = new CreateXFactory{salt: salt}();
-
-		string memory obj = "chain";
-		obj.serialize("id", chain.chainId);
-		obj.serialize("alias", chainAlias);
-		obj = obj.serialize("name", chain.name);
-
-		string memory json = "deployment";
-		json.serialize("address", address(createXFactory));
-		json.serialize("deployer", deployer);
-		json.serialize("salt", salt);
-		json.serialize("block", block.number);
-		json.serialize("timestamp", block.timestamp);
-		json = json.serialize("chain", obj);
-		json.write(path);
-
-		console.log("Deployed at:", address(createXFactory));
-		console.log("File Path:", path);
-		console.log("======================================================================");
-	}
-
-	function configureBroadcaster() internal virtual returns (address) {
+	function setUp() public {
 		uint256 privateKey = vm.envOr({
 			name: "PRIVATE_KEY",
 			defaultValue: vm.deriveKey({
-				mnemonic: vm.envOr({name: "MNEMONIC", defaultValue: TEST_MNEMONIC}),
+				mnemonic: vm.envOr({name: "MNEMONIC", defaultValue: DEFAULT_MNEMONIC}),
 				index: uint8(vm.envOr({name: "EOA_INDEX", defaultValue: uint256(0)}))
 			})
 		});
 
-		return vm.rememberKey(privateKey);
+		broadcaster = vm.rememberKey(privateKey);
+		salt = vm.envOr({name: "SALT", defaultValue: DEFAULT_SALT});
+	}
+
+	function run() external {
+		string[] memory chainAliases = vm.envString({name: "CHAINS", delim: ","});
+		for (uint256 i; i < chainAliases.length; ++i) deployToChain(chainAliases[i]);
+	}
+
+	function deployToChain(string memory chainAlias) internal broadcast(chainAlias) {
+		string memory path = string.concat("./deployments/", vm.toString(block.chainid), ".json");
+
+		console.log();
+		console.log("======================================================================");
+		console.log("Chain ID:", block.chainid);
+
+		CreateXFactory createXFactory = new CreateXFactory{salt: salt}();
+
+		string memory json = "deployment";
+		json.serialize("address", address(createXFactory));
+		json.serialize("block", block.number);
+		json.serialize("salt", salt);
+		json = json.serialize("timestamp", block.timestamp);
+		json.write(path);
+
+		console.log("Deployed at:", address(createXFactory));
+		console.log("======================================================================");
+		console.log();
 	}
 }
