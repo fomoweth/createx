@@ -35,10 +35,10 @@ contract Deploy is Script {
 
 	function run() external {
 		string[] memory chainAliases = vm.envString({name: "CHAINS", delim: ","});
-		for (uint256 i; i < chainAliases.length; ++i) deployToChain(chainAliases[i]);
+		for (uint256 i; i < chainAliases.length; ++i) deployOnChain(chainAliases[i]);
 	}
 
-	function deployToChain(string memory chainAlias) internal broadcast(chainAlias) {
+	function deployOnChain(string memory chainAlias) internal virtual broadcast(chainAlias) {
 		string memory path = string.concat("./deployments/", vm.toString(block.chainid), ".json");
 
 		console.log();

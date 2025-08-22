@@ -1,151 +1,340 @@
-# CreateX & CreateXFactory
+# CreateX
 
-A modular deployment toolkit for Ethereum smart contracts, supporting multiple creation strategies including `CREATE`, `CREATE2`, `CREATE3`, and `EIP-1167` minimal proxy clones.
+`CreateX` provides a comprehensive solution for deploying smart contracts using various creation opcodes and patterns, offering both a standalone library and a unified factory contract for traditional and deterministic deployment methods.
+
+## Features
+
+- **CREATE**: Traditional contract deployment
+- **CREATE2**: Deterministic contract deployment
+- **CREATE3**: Chain-agnostic deterministic deployment
+- **EIP-1167 Clone**: Minimal proxy pattern deployment
+- **EIP-1167 CloneDeterministic**: Deterministic minimal proxy deployment
+- **Address Prediction**: Compute contract addresses before deployment
+- **Dual Approach**: Use as a library in your contracts or interact with the deployed factory
+
+## Directory
+
+```text
+createx/
+├── deployments/...
+├── script/
+│   ├── Create.s.sol
+│   └── Deploy.s.sol
+├── src/
+│   ├── CreateX.sol
+│   ├── CreateXFactory.sol
+│   └── ICreateXFactory.sol
+└── test/
+    ├── mocks/...
+    └── CreateXFactory.t.sol
+```
+
+## Usage
+
+### Installation
+
+```bash
+forge install fomoweth/createx
+```
+
+### Build
+
+```shell
+forge build --sizes
+```
+
+### Test
+
+```bash
+# Run all tests
+forge test
+
+# Run with detailed traces
+forge test -vvv
+
+# Run with gas reporting
+forge test --gas-report
+```
+
+### Deploy
+
+```bash
+forge script script/Deploy.s.sol:DeployScript \
+    --broadcast \
+    --multi \
+    --slow \
+    --verify \
+    -vvvv
+```
+
+## Deployments
+
+`CreateXFactory` is deployed on the following networks:
+
+| Network      | Chain ID | Address                                                                                                                          |
+| ------------ | -------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| Ethereum     | 1        | [0xfC5D1D7b066730fC403C994365205a96fE1d8Bcf](https://etherscan.io/address/0xfC5D1D7b066730fC403C994365205a96fE1d8Bcf)            |
+| Optimism     | 10       | [0xfC5D1D7b066730fC403C994365205a96fE1d8Bcf](https://optimistic.etherscan.io/address/0xfC5D1D7b066730fC403C994365205a96fE1d8Bcf) |
+| Polygon      | 137      | [0xfC5D1D7b066730fC403C994365205a96fE1d8Bcf](https://polygonscan.com/address/0xfC5D1D7b066730fC403C994365205a96fE1d8Bcf)         |
+| Base         | 8453     | [0xfC5D1D7b066730fC403C994365205a96fE1d8Bcf](https://basescan.org/address/0xfC5D1D7b066730fC403C994365205a96fE1d8Bcf)            |
+| Arbitrum One | 42161    | [0xfC5D1D7b066730fC403C994365205a96fE1d8Bcf](https://arbiscan.io/address/0xfC5D1D7b066730fC403C994365205a96fE1d8Bcf)             |
 
 ---
 
-## CreateX
+# CreateX Library
 
-> Deployment Primitives Library
+> A low-level library that enables deterministic contract deployments and proxy clones using various creation patterns with gas efficiency.
 
-`CreateX` is a gas‑optimized Solidity library that exposes low‑level helpers for every major contract‑creation opcode and pattern.
+## Library API Reference
 
-### Features
-
-- Minimal and gas-optimized assembly implementations – no external dependencies
-- Deterministic address computation
-- Forward ETH with any deployment type
-- Reverts on failure using custom errors instead of returning zero addresses
-
-### API Surface
-
-| Method                                                             | Purpose                                         |
-| ------------------------------------------------------------------ | ----------------------------------------------- |
-| `create(initCode, value)`                                          | Deploy with `CREATE`                            |
-| `computeCreateAddress(deployer, nonce)`                            | Predict address for `CREATE`                    |
-| `create2(initCode, salt, value)`                                   | Deploy with `CREATE2`                           |
-| `computeCreate2Address(deployer, hash, salt)`                      | Predict address for `CREATE2`                   |
-| `create3(initCode, salt, value)`                                   | Deploy via proxy + `CREATE` (`CREATE3` pattern) |
-| `computeCreate3Address(deployer, salt)`                            | Predict address for `CREATE3`                   |
-| `clone(implementation, value)`                                     | Deploy minimal proxy via `CREATE`               |
-| `cloneDeterministic(implementation, salt, value)`                  | Deploy minimal proxy via `CREATE2`              |
-| `computeCloneDeterministicAddress(deployer, implementation, salt)` | Predict clone address                           |
-
-### Usage
+### Deployment Functions
 
 ```solidity
-// deterministic CREATE2 deployment
-bytes memory initCode = type(MyContract).creationCode;
-bytes32 initCodeHash = keccak256(initCode);
-bytes32 salt = keccak256("example");
+function create(bytes memory initCode) internal returns (address);
+function create(bytes memory initCode, uint256 value) internal returns (address);
 
-address predicted = CreateX.computeCreate2Address(address(this), initCodeHash, salt);
-address instance = CreateX.create2(initCode, salt, 0);
-require(instance == predicted, "unexpected address");
+function create2(bytes memory initCode, bytes32 salt) internal returns (address);
+function create2(bytes memory initCode, bytes32 salt, uint256 value) internal returns (address);
+
+function create3(bytes memory initCode, bytes32 salt) internal returns (address);
+function create3(bytes memory initCode, bytes32 salt, uint256 value) internal returns (address);
+
+function clone(address implementation) internal returns (address);
+function clone(address implementation, uint256 value) internal returns (address);
+
+function cloneDeterministic(address implementation, bytes32 salt) internal returns (address);
+function cloneDeterministic(address implementation, bytes32 salt, uint256 value) internal returns (address);
+```
+
+### Address Prediction Functions
+
+```solidity
+function computeCreateAddress(uint256 nonce) internal view returns (address);
+function computeCreateAddress(address deployer, uint256 nonce) internal pure returns (address);
+
+function computeCreate2Address(bytes32 initCodeHash, bytes32 salt) internal view returns (address);
+function computeCreate2Address(address deployer, bytes32 initCodeHash, bytes32 salt) internal pure returns (address);
+
+function computeCreate3Address(bytes32 salt) internal view returns (address);
+function computeCreate3Address(address deployer, bytes32 salt) internal pure returns (address);
+
+function computeCloneDeterministicAddress(address implementation, bytes32 salt) internal view returns (address);
+function computeCloneDeterministicAddress(address deployer, address implementation, bytes32 salt) internal pure returns (address);
+```
+
+### Example Usage
+
+Import and use the library functions directly:
+
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.30;
+
+import {CreateX} from "lib/createx/src/CreateX.sol";
+
+contract MyContract {
+    function deployCreate(bytes calldata initCode) external payable returns (address) {
+        return CreateX.create(initCode, msg.value);
+    }
+
+    function deployCreate2(bytes calldata initCode, bytes32 salt) external payable returns (address) {
+        return CreateX.create2(initCode, salt, msg.value);
+    }
+
+    function deployCreate3(bytes calldata initCode, bytes32 salt) external payable returns (address) {
+        return CreateX.create3(initCode, salt, msg.value);
+    }
+
+    function deployClone(address implementation) external payable returns (address) {
+        return CreateX.clone(implementation, msg.value);
+    }
+
+    function deployCloneDeterministic(address implementation, bytes32 salt) external payable returns (address) {
+        return CreateX.cloneDeterministic(implementation, salt, msg.value);
+    }
+
+    function computeAddress(uint256 nonce) public view returns (address) {
+        return CreateX.computeCreateAddress(nonce);
+    }
+
+    function computeAddress(bytes32 initCodeHash, bytes32 salt) public view returns (address) {
+        return CreateX.computeCreate2Address(initCodeHash, salt);
+    }
+
+    function computeAddress(bytes32 salt) public view returns (address) {
+        return CreateX.computeCreate3Address(salt);
+    }
+
+    function computeAddress(address implementation, bytes32 salt) public view returns (address) {
+        return CreateX.computeCloneDeterministicAddress(implementation, salt);
+    }
+}
 ```
 
 ---
 
-## CreateXFactory
+# CreateX Factory
 
-> Public Deployment Contract
+> A public deployment contract that exposes CreateX capabilities via a unified interface with salt guard.
 
-The `CreateXFactory` is a multi-chain compatible factory for deploying contracts using the `CreateX` primitives. It enables external users and protocols to deploy smart contracts deterministically with salt protection and creation type abstraction.
+## Factory API Reference
 
-### Key Features
-
-- Unified deployment entrypoint via `deployCreateX()`
-- Unified address prediction via `computeCreateXAddress()`
-- Supports `CREATE`, `CREATE2`, `CREATE3`, and `EIP-1167` minimal proxy clones
-- Strict and guarded salt protection (anti-front-running)
-- Compatible with multi-chain deployments
-
-### Salt Protection Mechanism
+### Creation Types
 
 ```solidity
-// Salt Layout: [0..19] caller prefix | [20..29] identifier | [30] guard | [31] mode
-
-enum Mode {
-	Raw,		// 0 – uses original salt without modification
-	Strict,		// 1 – enforces salt prefix matches caller or zero address
-	Guarded 	// 2 – apply guard logic (Caller / Chain / CallerAndChain)
-}
-
-enum Guard {
-	None,			// 0 – no guard, uses original salt
-	Caller,			// 1 – combines caller address with salt
-	Chain,			// 2 – combines chain ID with salt
-	CallerAndChain	// 3 – combines caller address, chain ID, and salt
+enum CreationType {
+    CREATE,              // 0 – traditional deployment
+    CREATE2,             // 1 – deterministic deployment
+    CREATE3,             // 2 – chain-agnostic deployment
+    Clone,               // 3 – EIP-1167 via CREATE
+    CloneDeterministic   // 4 – EIP-1167 via CREATE2
 }
 ```
 
 ### Deployment Functions
 
 ```solidity
-function deployCreateX(CreationType creationType, bytes calldata initCode, bytes32 salt) external returns (address);
+function createX(
+    CreationType creationType,
+    bytes calldata initCode,
+    bytes32 salt
+) external payable returns (address);
 
-function deployCreate(bytes calldata initCode) external returns (address);
-function deployCreate2(bytes calldata initCode, bytes32 salt) external returns (address);
-function deployCreate3(bytes calldata initCode, bytes32 salt) external returns (address);
+function create(bytes calldata initCode) external payable returns (address);
 
-function deployClone(address implementation) external returns (address);
-function deployCloneDeterministic(address implementation, bytes32 salt) external returns (address);
+function create2(bytes calldata initCode, bytes32 salt) external payable returns (address);
+
+function create3(bytes calldata initCode, bytes32 salt) external payable returns (address);
+
+function clone(address implementation) external payable returns (address);
+
+function cloneDeterministic(address implementation, bytes32 salt) external payable returns (address);
 ```
 
-### Address Prediction Helpers
+### Address Prediction Functions
 
 ```solidity
-function computeCreateXAddress(CreationType creationType, bytes32 hash, bytes32 salt) external view returns (address);
+function computeCreateXAddress(CreationType creationType, bytes32 initCodeHash, bytes32 salt) external view returns (address);
 
 function computeCreateAddress(uint256 nonce) external view returns (address);
-function computeCreate2Address(bytes32 hash, bytes32 salt) external view returns (address);
+
+function computeCreate2Address(bytes32 initCodeHash, bytes32 salt) external view returns (address);
+
 function computeCreate3Address(bytes32 salt) external view returns (address);
 
 function computeCloneDeterministicAddress(address implementation, bytes32 salt) external view returns (address);
 ```
 
-### Usage Snippet
+### Events
+
+The factory emits events for all deployments:
 
 ```solidity
-// deterministic CREATE3 deployment
-ICreateXFactory factory = ICreateXFactory(FACTORY);
+event ContractCreation(address indexed instance, address indexed deployer);
 
-bytes memory initCode = type(MyContract).creationCode;
-
-bytes32 salt  = bytes32(
-	abi.encodePacked(
-		msg.sender,
-		uint80(0x00), // identifier
-		ICreateXFactory.Guard.CallerAndChain,
-		ICreateXFactory.Mode.Guarded
-	)
-);
-
-address predicted = factory.computeCreateXAddress(
-	ICreateXFactory.CreationType.CREATE3,
-	bytes32(0),
-	salt
-);
-
-address instance = factory.deployCreateX{value: msg.value}(
-	ICreateXFactory.CreationType.CREATE3,
-	initCode,
-	salt
-);
-
-require(instance == predicted, "unexpected address");
+event ContractCreation(address indexed instance, address indexed deployer, bytes32 indexed salt);
 ```
 
-### Deployments
+### Custom Errors
 
-| Chain ID | Network Name     | Address                                                                                                                       |
-| -------- | ---------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| 84532    | Base Sepolia     | [0xaeE0e8254d6AAA8335c575FBfB0cb39AFcdae0bF](https://sepolia.basescan.org/address/0xaeE0e8254d6AAA8335c575FBfB0cb39AFcdae0bF) |
-| 421614   | Arbitrum Sepolia | [0xaeE0e8254d6AAA8335c575FBfB0cb39AFcdae0bF](https://sepolia.arbiscan.io/address/0xaeE0e8254d6AAA8335c575FBfB0cb39AFcdae0bF)  |
-| 11155111 | Sepolia          | [0xaeE0e8254d6AAA8335c575FBfB0cb39AFcdae0bF](https://sepolia.etherscan.io/address/0xaeE0e8254d6AAA8335c575FBfB0cb39AFcdae0bF) |
+Both the library and factory include comprehensive error handling:
+
+```solidity
+error ContractCreationFailed();    // Deployment failed
+error ProxyCreationFailed();       // CREATE3 proxy deployment failed
+error InsufficientBalance();       // Insufficient ETH balance
+error InvalidImplementation();     // Invalid implementation address for proxies
+error InvalidNonce();              // Nonce exceeds EIP-2681 limit
+error InvalidCreationType();       // Unsupported creation type (factory only)
+error InvalidSalt();               // Salt validation failed (factory only)
+```
+
+### Example Usage
+
+Import the interface and interact with the deployed factory:
+
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.30;
+
+import {ICreateXFactory} from "lib/createx/src/ICreateXFactory.sol";
+
+contract MyContract {
+    ICreateXFactory public immutable factory;
+
+	constructor(address _factory) {
+		factory = ICreateXFactory(_factory);
+	}
+
+    function deployCreate(bytes calldata initCode) external payable returns (address) {
+        return factory.create{value: msg.value}(initCode);
+    }
+
+    function deployCreate2(bytes calldata initCode, bytes32 salt) external payable returns (address) {
+        return factory.create2{value: msg.value}(initCode, salt);
+    }
+
+    function deployCreate3(bytes calldata initCode, bytes32 salt) external payable returns (address) {
+        return factory.create3{value: msg.value}(initCode, salt);
+    }
+
+    function deployClone(address implementation) external payable returns (address) {
+        return factory.clone{value: msg.value}(implementation);
+    }
+
+    function deployCloneDeterministic(address implementation, bytes32 salt) external payable returns (address) {
+        return factory.cloneDeterministic{value: msg.value}(implementation, salt);
+    }
+
+    function computeAddress(uint256 nonce) public view returns (address) {
+        return factory.computeCreateAddress(nonce);
+    }
+
+    function computeAddress(bytes32 initCodeHash, bytes32 salt) public view returns (address) {
+        return factory.computeCreate2Address(initCodeHash, salt);
+    }
+
+    function computeAddress(bytes32 salt) public view returns (address) {
+        return factory.computeCreate3Address(salt);
+    }
+
+    function computeAddress(address implementation, bytes32 salt) public view returns (address) {
+        return factory.computeCloneDeterministicAddress(implementation, salt);
+    }
+}
+```
+
+### Unified Deployment Interface
+
+The factory provides a single function that supports all deployment methods:
+
+```solidity
+function deployCreateX(
+    ICreateXFactory.CreationType creationType,
+    bytes calldata initCode,
+    bytes32 salt
+) external payable returns (address) {
+    return factory.createX{value: msg.value}(creationType, initCode, salt);
+}
+```
+
+### Salt Validation
+
+The factory includes built-in access control through salt validation:
+
+- For salted deployments (CREATE2, CREATE3, CloneDeterministic), the first 20 bytes of the salt must match either:
+  - The caller's address (for user-specific deployments)
+  - Zero address (for open deployments)
 
 ---
 
+## Acknowledgements
+
+The following repositories served as key references during the development of this project:
+
+- [Solady](https://github.com/Vectorized/solady)
+- [OpenZeppelin](https://github.com/OpenZeppelin/openzeppelin-contracts)
+
 ## Author
 
-- [@fomoweth](https://github.com/fomoweth)
+- [fomoweth](https://github.com/fomoweth)
