@@ -1,126 +1,108 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
+import {Test} from "forge-std/Test.sol";
 import {CreateXFactory, ICreateXFactory} from "src/CreateXFactory.sol";
 import {CreateX} from "src/CreateX.sol";
-import {MockERC20} from "test/shared/mocks/MockERC20.sol";
-import {MockTarget} from "test/shared/mocks/MockTarget.sol";
-import {BaseTest} from "test/shared/BaseTest.sol";
+import {MockERC20} from "test/mocks/MockERC20.sol";
+import {MockTarget} from "test/mocks/MockTarget.sol";
 
-contract CreateXFactoryTest is BaseTest {
+contract CreateXFactoryTest is Test {
+	uint256 internal snapshotId = type(uint256).max;
+
 	CreateXFactory internal factory;
 
-	address internal user;
+	modifier impersonate(address account, uint256 value) {
+		vm.assume(account != address(0));
+		if (value != uint256(0)) deal(account, value);
+		vm.startPrank(account);
+		_;
+		vm.stopPrank();
+	}
 
 	function setUp() public {
-		user = createAccount("User", 1000 ether);
-		factory = new CreateXFactory{salt: bytes32("CreateX")}();
+		factory = new CreateXFactory();
 	}
 
-	function test_deployCreateX(
+	function test_fuzz_createX(
 		bool protected,
-		uint8 mode,
-		uint8 guard,
-		uint80 identifier,
-		bytes32 key,
+		address deployer,
+		uint96 identifier,
 		uint256 value
-	) public impersonate(user) {
-		MockTarget instance;
-		address predicted;
-		address sender;
-
-		if (protected) {
-			mode = MODE_STRICT;
-			sender = user;
-		}
-
-		value = bound(value, 0, user.balance);
-
-		bytes32 original = encodeSalt(sender, mode, guard, identifier);
-		bytes32 salt = processSalt(original, user);
-
-		address mock = address(new MockTarget(key));
-		bytes memory initCode = bytes.concat(type(MockTarget).creationCode, abi.encode(key));
+	) public impersonate(deployer, value) {
+		bytes memory initCode = abi.encodePacked(type(MockTarget).creationCode);
 		bytes32 initCodeHash = keccak256(initCode);
+		bytes32 salt = generateSalt(deployer, identifier, protected);
+
+		address implementation = address(new MockTarget());
+		address instance;
+		address predicted;
 
 		revertToState();
-		predicted = factory.computeCreateAddress(vm.getNonce(address(factory)));
 
 		vm.expectEmit(true, true, true, true);
-		emit ICreateXFactory.ContractCreation(predicted, user);
-
-		instance = MockTarget(
-			factory.deployCreateX{value: value}(ICreateXFactory.CreationType.CREATE, initCode, original)
+		emit ICreateXFactory.ContractCreation(
+			predicted = factory.computeCreateAddress(vm.getNonce(address(factory))),
+			deployer
 		);
-		assertEq(address(instance), predicted);
-		assertEq(address(instance).balance, value);
 
+		instance = factory.createX{value: value}(ICreateXFactory.CreationType.CREATE, initCode, salt);
+		assertEq(instance, predicted);
+		assertEq(instance.balance, value);
 		revertToState();
-		predicted = factory.computeCreate2Address(initCodeHash, original);
 
 		vm.expectEmit(true, true, true, true);
-		emit ICreateXFactory.ContractCreation(predicted, salt, user);
-
-		instance = MockTarget(
-			factory.deployCreateX{value: value}(ICreateXFactory.CreationType.CREATE2, initCode, original)
+		emit ICreateXFactory.ContractCreation(
+			predicted = factory.computeCreate2Address(initCodeHash, salt),
+			deployer,
+			salt
 		);
-		assertEq(address(instance), predicted);
-		assertEq(address(instance).balance, value);
 
+		instance = factory.createX{value: value}(ICreateXFactory.CreationType.CREATE2, initCode, salt);
+		assertEq(instance, predicted);
+		assertEq(instance.balance, value);
 		revertToState();
-		predicted = factory.computeCreate3Address(original);
 
 		vm.expectEmit(true, true, true, true);
-		emit ICreateXFactory.ContractCreation(predicted, salt, user);
+		emit ICreateXFactory.ContractCreation(predicted = factory.computeCreate3Address(salt), deployer, salt);
 
-		instance = MockTarget(
-			factory.deployCreateX{value: value}(ICreateXFactory.CreationType.CREATE3, initCode, original)
-		);
-		assertEq(address(instance), predicted);
-		assertEq(address(instance).balance, value);
-
+		instance = factory.createX{value: value}(ICreateXFactory.CreationType.CREATE3, initCode, salt);
+		assertEq(instance, predicted);
+		assertEq(instance.balance, value);
 		revertToState();
-		predicted = factory.computeCreateAddress(vm.getNonce(address(factory)));
 
 		vm.expectEmit(true, true, true, true);
-		emit ICreateXFactory.ContractCreation(predicted, user);
-
-		instance = MockTarget(
-			factory.deployCreateX{value: value}(ICreateXFactory.CreationType.Clone, abi.encodePacked(mock), original)
+		emit ICreateXFactory.ContractCreation(
+			predicted = factory.computeCreateAddress(vm.getNonce(address(factory))),
+			deployer
 		);
-		assertEq(address(instance), predicted);
-		assertEq(address(instance).balance, value);
 
+		instance = factory.createX{value: value}(
+			ICreateXFactory.CreationType.Clone,
+			abi.encodePacked(implementation),
+			salt
+		);
+		assertEq(instance, predicted);
+		assertEq(instance.balance, value);
 		revertToState();
-		predicted = factory.computeCloneDeterministicAddress(mock, original);
 
 		vm.expectEmit(true, true, true, true);
-		emit ICreateXFactory.ContractCreation(predicted, salt, user);
-
-		instance = MockTarget(
-			factory.deployCreateX{value: value}(
-				ICreateXFactory.CreationType.CloneDeterministic,
-				abi.encodePacked(mock),
-				original
-			)
+		emit ICreateXFactory.ContractCreation(
+			predicted = factory.computeCloneDeterministicAddress(implementation, salt),
+			deployer,
+			salt
 		);
-		assertEq(address(instance), predicted);
-		assertEq(address(instance).balance, value);
+
+		instance = factory.createX{value: value}(
+			ICreateXFactory.CreationType.CloneDeterministic,
+			abi.encodePacked(implementation),
+			salt
+		);
+		assertEq(instance, predicted);
+		assertEq(instance.balance, value);
 	}
 
-	function test_computeCreateXAddress(
-		bool protected,
-		uint8 mode,
-		uint8 guard,
-		uint80 identifier,
-		bytes32 hash
-	) public impersonate(user) {
-		address sender;
-		if (protected) {
-			mode = MODE_STRICT;
-			sender = user;
-		}
-
+	function test_fuzz_computeCreateXAddress(bool protected, address deployer, uint96 identifier, bytes32 hash) public {
 		if (identifier >= type(uint64).max) {
 			vm.expectRevert(CreateX.InvalidNonce.selector);
 			factory.computeCreateXAddress(ICreateXFactory.CreationType.CREATE, hash, bytes32(uint256(identifier)));
@@ -136,16 +118,15 @@ contract CreateXFactoryTest is BaseTest {
 			);
 		}
 
-		bytes32 original = encodeSalt(sender, mode, guard, identifier);
-		bytes32 salt = processSalt(original, user);
+		bytes32 salt = generateSalt(deployer, identifier, protected);
 
 		assertEq(
-			factory.computeCreateXAddress(ICreateXFactory.CreationType.CREATE2, hash, original),
-			computeCreate2Address(address(factory), hash, salt)
+			factory.computeCreateXAddress(ICreateXFactory.CreationType.CREATE2, hash, salt),
+			vm.computeCreate2Address(salt, hash, address(factory))
 		);
 
 		assertEq(
-			factory.computeCreateXAddress(ICreateXFactory.CreationType.CREATE3, hash, original),
+			factory.computeCreateXAddress(ICreateXFactory.CreationType.CREATE3, hash, salt),
 			computeCreate3Address(address(factory), salt)
 		);
 
@@ -155,299 +136,215 @@ contract CreateXFactoryTest is BaseTest {
 			factory.computeCreateXAddress(
 				ICreateXFactory.CreationType.CloneDeterministic,
 				bytes32(bytes20(implementation)),
-				original
+				salt
 			),
 			computeCloneDeterministicAddress(address(factory), implementation, salt)
 		);
 	}
 
-	function test_deployCreate(bytes32 key, uint256 value) public impersonate(user) {
-		value = bound(value, 0, user.balance);
-
-		bytes memory initCode = bytes.concat(type(MockTarget).creationCode, abi.encode(key));
+	function test_fuzz_create(address deployer, uint256 value) public impersonate(deployer, value) {
+		bytes memory initCode = abi.encodePacked(type(MockTarget).creationCode);
 		address predicted = vm.computeCreateAddress(address(factory), vm.getNonce(address(factory)));
 
 		vm.expectEmit(true, true, true, true);
-		emit ICreateXFactory.ContractCreation(predicted, user);
+		emit ICreateXFactory.ContractCreation(predicted, deployer);
 
-		MockTarget instance = MockTarget(factory.deployCreate{value: value}(initCode));
-
+		MockTarget instance = MockTarget(factory.create{value: value}(initCode));
 		assertEq(address(instance), predicted);
 		assertEq(address(instance).balance, value);
-		assertEq(instance.key(), key);
-		assertEq(instance.getValue(), 0);
-		instance.setValue(value);
-		assertEq(instance.getValue(), value);
+		assertEq(instance.getValue(), uint256(0));
+		assertEq(instance.setValue(value), value);
 	}
 
-	function test_deployCreateERC20() public impersonate(user) {
+	function test_create_deployERC20() public {
 		bytes memory initCode = bytes.concat(type(MockERC20).creationCode, abi.encode("Mock Token", "MOCK", 18));
-
 		address predicted = vm.computeCreateAddress(address(factory), vm.getNonce(address(factory)));
 
 		vm.expectEmit(true, true, true, true);
-		emit ICreateXFactory.ContractCreation(predicted, user);
+		emit ICreateXFactory.ContractCreation(predicted, address(this));
 
-		MockERC20 token = MockERC20(factory.deployCreate(initCode));
-
+		MockERC20 token = MockERC20(factory.create(initCode));
 		assertEq(address(token), predicted);
-		assertEq(address(token).balance, 0);
 		assertEq(token.name(), "Mock Token");
 		assertEq(token.symbol(), "MOCK");
 		assertEq(token.decimals(), 18);
 	}
 
-	function test_deployCreate2(
+	function test_fuzz_create2(
 		bool protected,
-		uint8 mode,
-		uint8 guard,
-		uint80 identifier,
-		bytes32 key,
+		address deployer,
+		uint96 identifier,
 		uint256 value
-	) public impersonate(user) {
-		value = bound(value, 0, user.balance);
-
-		address sender;
-		if (protected) {
-			mode = MODE_STRICT;
-			sender = user;
-		}
-
-		bytes32 original = generateSalt(sender, mode, guard, identifier);
-		bytes32 salt = processSalt(original, user);
-
-		bytes memory initCode = bytes.concat(type(MockTarget).creationCode, abi.encode(key));
-		address predicted = computeCreate2Address(address(factory), keccak256(initCode), salt);
+	) public impersonate(deployer, value) {
+		bytes memory initCode = abi.encodePacked(type(MockTarget).creationCode);
+		bytes32 initCodeHash = keccak256(initCode);
+		bytes32 salt = generateSalt(deployer, identifier, protected);
+		address predicted = computeCreate2Address(address(factory), initCodeHash, salt);
 
 		vm.expectEmit(true, true, true, true);
-		emit ICreateXFactory.ContractCreation(predicted, salt, user);
+		emit ICreateXFactory.ContractCreation(predicted, deployer, salt);
 
-		MockTarget instance = MockTarget(factory.deployCreate2{value: value}(initCode, original));
-
+		MockTarget instance = MockTarget(factory.create2{value: value}(initCode, salt));
 		assertEq(address(instance), predicted);
 		assertEq(address(instance).balance, value);
-		assertEq(instance.key(), key);
-		assertEq(instance.getValue(), 0);
-		instance.setValue(value);
-		assertEq(instance.getValue(), value);
+		assertEq(instance.getValue(), uint256(0));
+		assertEq(instance.setValue(value), value);
 	}
 
-	function test_deployCreate2ERC20() public impersonate(user) {
-		bytes32 salt = encodeSalt(user, MODE_RAW, GUARD_NONE, 0);
+	function test_create2_deployERC20() public {
 		bytes memory initCode = bytes.concat(type(MockERC20).creationCode, abi.encode("Mock Token", "MOCK", 18));
-
-		address predicted = computeCreate2Address(address(factory), keccak256(initCode), salt);
+		bytes32 initCodeHash = keccak256(initCode);
+		bytes32 salt = generateSalt(address(0), uint96(0));
+		address predicted = computeCreate2Address(address(factory), initCodeHash, salt);
 
 		vm.expectEmit(true, true, true, true);
-		emit ICreateXFactory.ContractCreation(predicted, salt, user);
+		emit ICreateXFactory.ContractCreation(predicted, address(this), salt);
 
-		MockERC20 token = MockERC20(factory.deployCreate2(initCode, salt));
-
+		MockERC20 token = MockERC20(factory.create2(initCode, salt));
 		assertEq(address(token), predicted);
-		assertEq(address(token).balance, 0);
 		assertEq(token.name(), "Mock Token");
 		assertEq(token.symbol(), "MOCK");
 		assertEq(token.decimals(), 18);
 	}
 
-	function test_deployCreate3(
+	function test_fuzz_create3(
 		bool protected,
-		uint8 mode,
-		uint8 guard,
-		uint80 identifier,
-		bytes32 key,
+		address deployer,
+		uint96 identifier,
 		uint256 value
-	) public impersonate(user) {
-		value = bound(value, 0, user.balance);
-
-		address sender;
-		if (protected) {
-			mode = MODE_STRICT;
-			sender = user;
-		}
-
-		bytes32 original = encodeSalt(sender, mode, guard, identifier);
-		bytes32 salt = processSalt(original, user);
-
-		bytes memory initCode = bytes.concat(type(MockTarget).creationCode, abi.encode(key));
+	) public impersonate(deployer, value) {
+		bytes memory initCode = abi.encodePacked(type(MockTarget).creationCode);
+		bytes32 salt = generateSalt(deployer, identifier, protected);
 		address predicted = computeCreate3Address(address(factory), salt);
 
 		vm.expectEmit(true, true, true, true);
-		emit ICreateXFactory.ContractCreation(predicted, salt, user);
+		emit ICreateXFactory.ContractCreation(predicted, deployer, salt);
 
-		MockTarget instance = MockTarget(factory.deployCreate3{value: value}(initCode, original));
-
+		MockTarget instance = MockTarget(factory.create3{value: value}(initCode, salt));
 		assertEq(address(instance), predicted);
 		assertEq(address(instance).balance, value);
-		assertEq(instance.key(), key);
-		assertEq(instance.getValue(), 0);
-		instance.setValue(value);
-		assertEq(instance.getValue(), value);
+		assertEq(instance.getValue(), uint256(0));
+		assertEq(instance.setValue(value), value);
 	}
 
-	function test_deployCreate3ERC20() public impersonate(user) {
-		bytes32 salt = encodeSalt(user, MODE_RAW, GUARD_NONE, 0);
+	function test_create3_deployERC20() public {
 		bytes memory initCode = bytes.concat(type(MockERC20).creationCode, abi.encode("Mock Token", "MOCK", 18));
-
+		bytes32 salt = generateSalt(address(0), uint96(0));
 		address predicted = computeCreate3Address(address(factory), salt);
 
 		vm.expectEmit(true, true, true, true);
-		emit ICreateXFactory.ContractCreation(predicted, salt, user);
+		emit ICreateXFactory.ContractCreation(predicted, address(this), salt);
 
-		MockERC20 token = MockERC20(factory.deployCreate3(initCode, salt));
-
+		MockERC20 token = MockERC20(factory.create3(initCode, salt));
 		assertEq(address(token), predicted);
-		assertEq(address(token).balance, 0);
 		assertEq(token.name(), "Mock Token");
 		assertEq(token.symbol(), "MOCK");
 		assertEq(token.decimals(), 18);
 	}
 
-	function test_deployCreate3ChainAgnosticDeployment() internal impersonate(user) {
-		bytes32 salt = processSalt(encodeSalt(user, MODE_RAW, GUARD_NONE, 0));
+	function test_create3_chainAgnosticDeployment() public {
+		vm.makePersistent(address(factory));
+
 		bytes memory initCode = bytes.concat(type(MockERC20).creationCode, abi.encode("Mock Token", "MOCK", 18));
+		bytes32 salt = generateSalt(address(this));
 
 		vm.createSelectFork("ethereum");
-		factory = new CreateXFactory{salt: bytes32("CreateX")}();
-		address ethereum = factory.deployCreate3(initCode, salt);
+		address instance = factory.create3(initCode, salt);
 
 		vm.createSelectFork("optimism");
-		factory = new CreateXFactory{salt: bytes32("CreateX")}();
-		address optimism = factory.deployCreate3(initCode, salt);
+		assertEq(instance, factory.create3(initCode, salt));
 
 		vm.createSelectFork("bnb");
-		factory = new CreateXFactory{salt: bytes32("CreateX")}();
-		address bnb = factory.deployCreate3(initCode, salt);
+		assertEq(instance, factory.create3(initCode, salt));
 
 		vm.createSelectFork("polygon");
-		factory = new CreateXFactory{salt: bytes32("CreateX")}();
-		address polygon = factory.deployCreate3(initCode, salt);
+		assertEq(instance, factory.create3(initCode, salt));
 
 		vm.createSelectFork("unichain");
-		factory = new CreateXFactory{salt: bytes32("CreateX")}();
-		address unichain = factory.deployCreate3(initCode, salt);
+		assertEq(instance, factory.create3(initCode, salt));
 
 		vm.createSelectFork("fantom");
-		factory = new CreateXFactory{salt: bytes32("CreateX")}();
-		address fantom = factory.deployCreate3(initCode, salt);
+		assertEq(instance, factory.create3(initCode, salt));
 
 		vm.createSelectFork("base");
-		factory = new CreateXFactory{salt: bytes32("CreateX")}();
-		address base = factory.deployCreate3(initCode, salt);
+		assertEq(instance, factory.create3(initCode, salt));
 
 		vm.createSelectFork("arbitrum");
-		factory = new CreateXFactory{salt: bytes32("CreateX")}();
-		address arbitrum = factory.deployCreate3(initCode, salt);
+		assertEq(instance, factory.create3(initCode, salt));
 
 		vm.createSelectFork("avalanche");
-		factory = new CreateXFactory{salt: bytes32("CreateX")}();
-		address avalanche = factory.deployCreate3(initCode, salt);
+		assertEq(instance, factory.create3(initCode, salt));
+
+		vm.createSelectFork("scroll");
+		assertEq(instance, factory.create3(initCode, salt));
 
 		vm.createSelectFork("linea");
-		factory = new CreateXFactory{salt: bytes32("CreateX")}();
-		address linea = factory.deployCreate3(initCode, salt);
-
-		assertEq(ethereum, optimism);
-		assertEq(ethereum, bnb);
-		assertEq(ethereum, polygon);
-		assertEq(ethereum, unichain);
-		assertEq(ethereum, fantom);
-		assertEq(ethereum, base);
-		assertEq(ethereum, arbitrum);
-		assertEq(ethereum, avalanche);
-		assertEq(ethereum, linea);
+		assertEq(instance, factory.create3(initCode, salt));
 	}
 
-	function test_deployCreate3_revertsDeploymentForSameSalt() public impersonate(user) {
-		bytes32 salt = processSalt(encodeSalt(user, MODE_RAW, GUARD_NONE, 0));
-		bytes memory initCode = bytes.concat(type(MockTarget).creationCode, abi.encode(bytes32("KEY")));
+	function test_create3_revertsOnSameSaltDeployments() public {
+		bytes memory mockInitCode = abi.encodePacked(type(MockTarget).creationCode);
+		bytes memory erc20InitCode = bytes.concat(type(MockERC20).creationCode, abi.encode("Mock Token", "MOCK", 18));
+		bytes32 salt = generateSalt(address(this));
 
-		factory.deployCreate3(initCode, salt);
+		factory.create3(mockInitCode, salt);
 		vm.expectRevert(CreateX.ProxyCreationFailed.selector);
-		factory.deployCreate3(initCode, salt);
-	}
-
-	function test_deployCreate3_revertsDeploymentForSameSaltDifferentCode() public impersonate(user) {
-		bytes32 salt = processSalt(encodeSalt(user, MODE_RAW, GUARD_NONE, 0));
-		bytes memory mockInitCode = bytes.concat(type(MockTarget).creationCode, abi.encode(bytes32("KEY")));
-		bytes memory tokenInitCode = bytes.concat(type(MockERC20).creationCode, abi.encode("Mock Token", "MOCK", 18));
-
-		factory.deployCreate3(mockInitCode, salt);
+		factory.create3(mockInitCode, salt);
 		vm.expectRevert(CreateX.ProxyCreationFailed.selector);
-		factory.deployCreate3(tokenInitCode, salt);
+		factory.create3(erc20InitCode, salt);
 	}
 
-	function test_deployClone(bytes32 key, uint256 value) public impersonate(user) {
-		value = bound(value, 0, user.balance);
-
-		MockTarget mock = new MockTarget(key);
+	function test_fuzz_clone(address deployer, uint256 value) public impersonate(deployer, value) {
+		address implementation = address(new MockTarget());
 		address predicted = vm.computeCreateAddress(address(factory), vm.getNonce(address(factory)));
 
 		vm.expectEmit(true, true, true, true);
-		emit ICreateXFactory.ContractCreation(predicted, user);
+		emit ICreateXFactory.ContractCreation(predicted, deployer);
 
-		MockTarget instance = MockTarget(factory.deployClone{value: value}(address(mock)));
-
+		MockTarget instance = MockTarget(factory.clone{value: value}(implementation));
 		assertEq(address(instance), predicted);
 		assertEq(address(instance).balance, value);
-		assertEq(instance.key(), mock.key());
-		assertEq(instance.getValue(), 0);
-		instance.setValue(value);
-		assertEq(instance.getValue(), value);
+		assertEq(instance.getValue(), uint256(0));
+		assertEq(instance.setValue(value), value);
 	}
 
-	function test_deployClone_revertsIfInvalidImplementationGiven() public impersonate(user) {
+	function test_clone_revertsIfInvalidImplementationGiven() public {
 		vm.expectRevert(CreateX.InvalidImplementation.selector);
-		factory.deployClone(address(0));
+		factory.clone(address(0));
 
 		vm.expectRevert(CreateX.InvalidImplementation.selector);
-		factory.deployClone(user);
+		factory.clone(address(0xdeadbeef));
 	}
 
-	function test_deployCloneDeterministic(
+	function test_fuzz_cloneDeterministic(
 		bool protected,
-		uint8 mode,
-		uint8 guard,
-		uint80 identifier,
-		bytes32 key,
+		address deployer,
+		uint96 identifier,
 		uint256 value
-	) public impersonate(user) {
-		value = bound(value, 0, user.balance);
-
-		address sender;
-		if (protected) {
-			mode = MODE_STRICT;
-			sender = user;
-		}
-
-		bytes32 original = encodeSalt(sender, mode, guard, identifier);
-		bytes32 salt = processSalt(original, user);
-
-		MockTarget mock = new MockTarget(key);
-		address predicted = computeCloneDeterministicAddress(address(factory), address(mock), salt);
+	) public impersonate(deployer, value) {
+		bytes32 salt = generateSalt(deployer, identifier, protected);
+		address implementation = address(new MockTarget());
+		address predicted = computeCloneDeterministicAddress(address(factory), implementation, salt);
 
 		vm.expectEmit(true, true, true, true);
-		emit ICreateXFactory.ContractCreation(predicted, salt, user);
+		emit ICreateXFactory.ContractCreation(predicted, deployer, salt);
 
-		MockTarget instance = MockTarget(factory.deployCloneDeterministic{value: value}(address(mock), original));
-
+		MockTarget instance = MockTarget(factory.cloneDeterministic{value: value}(implementation, salt));
 		assertEq(address(instance), predicted);
 		assertEq(address(instance).balance, value);
-		assertEq(instance.key(), mock.key());
-		assertEq(instance.getValue(), 0);
-		instance.setValue(value);
-		assertEq(instance.getValue(), value);
+		assertEq(instance.getValue(), uint256(0));
+		assertEq(instance.setValue(value), value);
 	}
 
-	function test_deployCloneDeterministic_revertsIfInvalidImplementationGiven() public impersonate(user) {
+	function test_cloneDeterministic_revertsIfInvalidImplementationGiven() public {
 		vm.expectRevert(CreateX.InvalidImplementation.selector);
-		factory.deployCloneDeterministic(address(0), bytes32(0));
+		factory.cloneDeterministic(address(0), bytes32(0));
 
 		vm.expectRevert(CreateX.InvalidImplementation.selector);
-		factory.deployCloneDeterministic(user, bytes32(0));
+		factory.cloneDeterministic(address(0xdeadbeef), bytes32(0));
 	}
 
-	function test_computeCreateAddress(address deployer, uint256 nonce) public {
+	function test_fuzz_computeCreateAddress(address deployer, uint256 nonce) public {
 		if (nonce >= type(uint64).max) {
 			vm.expectRevert(CreateX.InvalidNonce.selector);
 			factory.computeCreateAddress(nonce);
@@ -456,18 +353,68 @@ contract CreateXFactoryTest is BaseTest {
 		}
 	}
 
-	function test_computeCreate2Address(address deployer, bytes32 hash, bytes32 salt) public pure {
+	function test_fuzz_computeCreate2Address(address deployer, bytes32 hash, bytes32 salt) public pure {
 		assertEq(CreateX.computeCreate2Address(deployer, hash, salt), computeCreate2Address(deployer, hash, salt));
 	}
 
-	function test_computeCreate3Address(address deployer, bytes32 salt) public pure {
+	function test_fuzz_computeCreate3Address(address deployer, bytes32 salt) public pure {
 		assertEq(CreateX.computeCreate3Address(deployer, salt), computeCreate3Address(deployer, salt));
 	}
 
-	function test_computeCloneDeterministicAddress(address deployer, address implementation, bytes32 salt) public pure {
+	function test_fuzz_computeCloneDeterministicAddress(
+		address deployer,
+		address implementation,
+		bytes32 salt
+	) public pure {
 		assertEq(
 			CreateX.computeCloneDeterministicAddress(deployer, implementation, salt),
 			computeCloneDeterministicAddress(deployer, implementation, salt)
 		);
+	}
+
+	function computeCreate2Address(
+		address deployer,
+		bytes32 initCodeHash,
+		bytes32 salt
+	) internal pure returns (address predicted) {
+		return address(uint160(uint256(keccak256(abi.encodePacked(hex"ff", deployer, salt, initCodeHash)))));
+	}
+
+	function computeCreate3Address(address deployer, bytes32 salt) internal pure returns (address predicted) {
+		bytes32 initCodeHash = 0x21c35dbe1b344a2488cf3321d6ce542f8e9f305544ff09e4993a62319a497c1f;
+		address proxy = computeCreate2Address(deployer, initCodeHash, salt);
+		return address(uint160(uint256(keccak256(abi.encodePacked(hex"d6_94", proxy, hex"01")))));
+	}
+
+	function computeCloneDeterministicAddress(
+		address deployer,
+		address implementation,
+		bytes32 salt
+	) internal pure returns (address predicted) {
+		bytes32 initCodeHash = keccak256(
+			abi.encodePacked(
+				hex"3d602d80600a3d3981f3363d3d373d3d3d363d73",
+				bytes20(implementation),
+				hex"5af43d82803e903d91602b57fd5bf3"
+			)
+		);
+		return computeCreate2Address(deployer, initCodeHash, salt);
+	}
+
+	function generateSalt(address caller) internal returns (bytes32 salt) {
+		return generateSalt(caller, uint96(vm.randomUint(type(uint96).min, type(uint96).max)));
+	}
+
+	function generateSalt(address caller, uint96 identifier) internal pure returns (bytes32 salt) {
+		return bytes32((uint256(uint160(caller)) << 96) | uint256(identifier));
+	}
+
+	function generateSalt(address caller, uint96 identifier, bool protected) internal pure returns (bytes32 salt) {
+		return generateSalt(protected ? caller : address(0), identifier);
+	}
+
+	function revertToState() internal {
+		if (snapshotId != type(uint256).max) vm.revertToState(snapshotId);
+		snapshotId = vm.snapshotState();
 	}
 }

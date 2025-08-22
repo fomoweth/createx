@@ -1,7 +1,7 @@
 [profile.default]
 solc = "0.8.30"
 evm_version = "cancun"
-gas_limit = "300000000"
+allow_internal_expect_revert = true
 bytecode_hash = "none"
 cbor_metadata = false
 dynamic_test_linking = true
@@ -18,12 +18,8 @@ fs_permissions = [
 gas_reports = ["CreateXFactory"]
 
 [fuzz]
-runs = 1000
+runs = 5000
 max_test_rejects = 1000000
-
-[invariant]
-runs = 1000
-depth = 50
 
 [rpc_endpoints]
 ethereum = "${ETHEREUM_RPC_URL}"
@@ -44,6 +40,8 @@ arbitrum = "${ARBITRUM_RPC_URL}"
 arbitrum-sepolia = "${ARBITRUM_SEPOLIA_RPC_URL}"
 avalanche = "${AVALANCHE_RPC_URL}"
 avalanche-fuji = "${AVALANCHE_FUJI_RPC_URL}"
+scroll = "${SCROLL_RPC_URL}"
+scroll-sepolia = "${SCROLL_SEPOLIA_RPC_URL}"
 linea = "${LINEA_RPC_URL}"
 linea-sepolia = "${LINEA_SEPOLIA_RPC_URL}"
 
@@ -66,6 +64,8 @@ arbitrum = { key = "${ETHERSCAN_API_KEY}", chainId = 42161 }
 arbitrum-sepolia = { key = "${ETHERSCAN_API_KEY}", chainId = 421614 }
 avalanche = { key = "${ETHERSCAN_API_KEY}", chainId = 43114 }
 avalanche-fuji = { key = "${ETHERSCAN_API_KEY}", chainId = 43113 }
+scroll = { key = "${ETHERSCAN_API_KEY}", chainId = 534352 }
+scroll-sepolia = { key = "${ETHERSCAN_API_KEY}", chainId = 534351 }
 linea = { key = "${ETHERSCAN_API_KEY}", chainId = 59144 }
 linea-sepolia = { key = "${ETHERSCAN_API_KEY}", chainId = 59141 }
 
