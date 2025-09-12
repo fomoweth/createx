@@ -1,22 +1,19 @@
 {
+	"printWidth": 120,
+	"tabWidth": 4,
+	"useTabs": true,
+	"singleQuote": false,
+	"trailingComma": "all",
 	"overrides": [
 		{
 			"files": "*.sol",
 			"options": {
-				"printWidth": 120,
-				"tabWidth": 4,
-				"useTabs": true,
-				"singleQuote": false,
 				"bracketSpacing": false
 			}
 		},
 		{
-			"files": ["*.json"],
-			"options": {
-				"tabWidth": 4,
-				"useTabs": true,
-				"singleQuote": false
-			}
+			"files": ["*.ts", "*.js", "*.json"],
+			"options": {}
 		}
 	]
 }
