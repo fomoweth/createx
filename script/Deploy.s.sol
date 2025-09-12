@@ -1,61 +1,24 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
-import {Script, console2 as console, stdJson} from "forge-std/Script.sol";
 import {CreateXFactory} from "src/CreateXFactory.sol";
+import {BaseScript} from "./BaseScript.sol";
 
-contract Deploy is Script {
-	using stdJson for string;
-
-	string private constant DEFAULT_MNEMONIC = "test test test test test test test test test test test junk";
-	bytes32 private constant DEFAULT_SALT = 0x0000000000000000000000000000000000000000000000000000000000000000;
-
-	address internal broadcaster;
+contract Deploy is BaseScript {
 	bytes32 internal salt;
 
-	modifier broadcast(string memory chainAlias) {
-		vm.createSelectFork(chainAlias);
-		vm.startBroadcast(broadcaster);
-		_;
-		vm.stopBroadcast();
-	}
-
-	function setUp() public {
-		uint256 privateKey = vm.envOr({
-			name: "PRIVATE_KEY",
-			defaultValue: vm.deriveKey({
-				mnemonic: vm.envOr({name: "MNEMONIC", defaultValue: DEFAULT_MNEMONIC}),
-				index: uint8(vm.envOr({name: "EOA_INDEX", defaultValue: uint256(0)}))
-			})
-		});
-
-		broadcaster = vm.rememberKey(privateKey);
-		salt = vm.envOr({name: "SALT", defaultValue: DEFAULT_SALT});
+	function setUp() public virtual override {
+		super.setUp();
+		salt = vm.envOr({name: "SALT", defaultValue: defaultSalt()});
 	}
 
 	function run() external {
-		string[] memory chainAliases = vm.envString({name: "CHAINS", delim: ","});
+		string[] memory chainAliases = promptChains();
 		for (uint256 i; i < chainAliases.length; ++i) deployOnChain(chainAliases[i]);
 	}
 
-	function deployOnChain(string memory chainAlias) internal virtual broadcast(chainAlias) {
-		string memory path = string.concat("./deployments/", vm.toString(block.chainid), ".json");
-
-		console.log();
-		console.log("======================================================================");
-		console.log("Chain ID:", block.chainid);
-
-		CreateXFactory createXFactory = new CreateXFactory{salt: salt}();
-
-		string memory json = "deployment";
-		json.serialize("address", address(createXFactory));
-		json.serialize("block", block.number);
-		json.serialize("salt", salt);
-		json = json.serialize("timestamp", block.timestamp);
-		json.write(path);
-
-		console.log("Deployed at:", address(createXFactory));
-		console.log("======================================================================");
-		console.log();
+	function deployOnChain(string memory chainAlias) internal fork(chainAlias) broadcast {
+		string memory path = string.concat(vm.projectRoot(), "/deployments/", vm.toString(block.chainid), ".json");
+		generateJson(path, "CreateXFactory", address(new CreateXFactory{salt: salt}()), salt);
 	}
 }

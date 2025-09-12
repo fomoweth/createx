@@ -4,13 +4,13 @@
 
 ## Features
 
-- **CREATE**: Traditional contract deployment
-- **CREATE2**: Deterministic contract deployment
-- **CREATE3**: Chain-agnostic deterministic deployment
-- **EIP-1167 Clone**: Minimal proxy pattern deployment
-- **EIP-1167 CloneDeterministic**: Deterministic minimal proxy deployment
-- **Address Prediction**: Compute contract addresses before deployment
-- **Dual Approach**: Use as a library in your contracts or interact with the deployed factory
+-   **CREATE**: Traditional contract deployment
+-   **CREATE2**: Deterministic contract deployment
+-   **CREATE3**: Chain-agnostic deterministic deployment
+-   **EIP-1167 Clone**: Minimal proxy pattern deployment
+-   **EIP-1167 CloneDeterministic**: Deterministic minimal proxy deployment
+-   **Address Prediction**: Compute contract addresses before deployment
+-   **Dual Approach**: Use as a library in your contracts or interact with the deployed factory
 
 ## Directory
 
@@ -18,7 +18,7 @@
 createx/
 ├── deployments/...
 ├── script/
-│   ├── Create.s.sol
+│   ├── CreateX.s.sol
 │   └── Deploy.s.sol
 ├── src/
 │   ├── CreateX.sol
@@ -322,9 +322,9 @@ function deployCreateX(
 
 The factory includes built-in access control through salt validation:
 
-- For salted deployments (CREATE2, CREATE3, CloneDeterministic), the first 20 bytes of the salt must match either:
-  - The caller's address (for user-specific deployments)
-  - Zero address (for open deployments)
+-   For salted deployments (CREATE2, CREATE3, CloneDeterministic), the first 20 bytes of the salt must match either:
+    -   The caller's address (for user-specific deployments)
+    -   Zero address (for open deployments)
 
 ---
 
@@ -332,9 +332,9 @@ The factory includes built-in access control through salt validation:
 
 The following repositories served as key references during the development of this project:
 
-- [Solady](https://github.com/Vectorized/solady)
-- [OpenZeppelin](https://github.com/OpenZeppelin/openzeppelin-contracts)
+-   [Solady](https://github.com/Vectorized/solady)
+-   [OpenZeppelin](https://github.com/OpenZeppelin/openzeppelin-contracts)
 
 ## Author
 
-- [fomoweth](https://github.com/fomoweth)
+-   [fomoweth](https://github.com/fomoweth)

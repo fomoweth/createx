@@ -9,12 +9,14 @@ ffi = true
 optimizer = true
 optimizer_runs = 44444444
 via_ir = true
+
 fs_permissions = [
     { access = "read-write", path = "./deployments"},
     { access = "read", path = "./out"},
 	{ access = "read", path = "./script" },
     { access = "read", path = "./test"}
 ]
+
 gas_reports = ["CreateXFactory"]
 
 [fuzz]
