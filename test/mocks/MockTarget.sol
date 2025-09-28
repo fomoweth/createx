@@ -2,15 +2,15 @@
 pragma solidity ^0.8.30;
 
 contract MockTarget {
-	uint256 private _value;
+    uint256 private _value;
 
-	constructor() payable {}
+    constructor() payable {}
 
-	function setValue(uint256 value) public returns (uint256) {
-		return _value = value;
-	}
+    function setValue(uint256 value) public returns (uint256) {
+        return _value = value;
+    }
 
-	function getValue() public view returns (uint256) {
-		return _value;
-	}
+    function getValue() public view returns (uint256) {
+        return _value;
+    }
 }
