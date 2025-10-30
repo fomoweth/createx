@@ -223,7 +223,7 @@ contract CreateXFactoryTest is Test, Config {
     }
 
     function test_create3_chainAgnosticDeployment() public {
-        _loadConfigAndForks("./config.toml", false);
+        _loadConfigAndForks("./config/test.toml", false);
 
         uint256[] memory chains = config.getChainIds();
         assertGt(chains.length, 0);

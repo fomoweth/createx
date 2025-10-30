@@ -24,7 +24,7 @@ abstract contract BaseScript is Script, Config {
     }
 
     function setUp() public virtual {
-        _loadConfigAndForks("./config.toml", true);
+        _loadConfigAndForks("./config/deployments.toml", true);
         broadcaster = vm.rememberKey(configurePrivateKey());
     }
 
