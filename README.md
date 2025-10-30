@@ -59,7 +59,7 @@ forge test --gas-report
 ### Deploy
 
 ```bash
-forge script script/Deploy.s.sol \
+forge script script/Deploy.s.sol:DeployScript \
     --broadcast \
     --multi \
     --slow \

@@ -2,49 +2,56 @@
 pragma solidity ^0.8.30;
 
 import {ICreateXFactory} from "src/ICreateXFactory.sol";
-import {CreateX as CreateXLib} from "src/CreateX.sol";
+import {CreateX} from "src/CreateX.sol";
 import {BaseScript} from "./BaseScript.sol";
 import {ERC1967_PROXY_BYTECODE, TRANSPARENT_PROXY_BYTECODE} from "./Precompiles.sol";
 
-contract CreateX is BaseScript {
+contract CreateXScript is BaseScript {
+    error UnsupportedChain(uint256 chainId);
+
     ICreateXFactory internal constant CREATEX_FACTORY = ICreateXFactory(0xfC5D1D7b066730fC403C994365205a96fE1d8Bcf);
 
-    function deployContract() internal virtual broadcast returns (address) {
-        uint256 creationType = promptCreationType();
-        bytes memory initCode;
-        bytes32 salt;
-        uint256 value;
+    function setUp() public virtual override {
+        super.setUp();
+        if (address(CREATEX_FACTORY).code.length == 0) revert UnsupportedChain(vm.getChainId());
+    }
 
-        if (creationType < uint8(ICreateXFactory.CreationType.Clone)) {
-            bytes memory creationCode = vm.getCode(prompt("Artifact path"));
+    function deployContract() internal virtual returns (address) {
+        ICreateXFactory.CreationType creationType = promptCreationType();
+
+        bytes memory initCode;
+        if (creationType < ICreateXFactory.CreationType.Clone) {
+            bytes memory bytecode = vm.getCode(prompt("Artifact path"));
             bytes memory arguments = promptBytes("Constructor arguments");
-            initCode = bytes.concat(creationCode, arguments);
+            initCode = bytes.concat(bytecode, arguments);
         } else {
             address implementation = vm.promptAddress("Implementation");
             initCode = abi.encodePacked(implementation);
         }
 
-        if (
-            creationType != uint8(ICreateXFactory.CreationType.CREATE)
-                && creationType != uint8(ICreateXFactory.CreationType.Clone)
-        ) {
-            salt = promptBytes32("Salt", defaultSalt());
+        bytes32 salt;
+        if (creationType != ICreateXFactory.CreationType.CREATE && creationType != ICreateXFactory.CreationType.Clone) {
+            salt = promptBytes32("Salt", bytes32(0));
         }
 
-        value = promptUint256("msg.value");
-
+        uint256 value = promptUint256("msg.value");
         return deployCreateX(creationType, initCode, salt, value);
     }
 
-    function deployCreateX(uint256 creationType, bytes memory initCode, bytes32 salt) internal returns (address) {
-        return deployCreateX(creationType, initCode, salt, 0);
-    }
-
-    function deployCreateX(uint256 creationType, bytes memory initCode, bytes32 salt, uint256 value)
+    function deployCreateX(ICreateXFactory.CreationType creationType, bytes memory initCode, bytes32 salt)
         internal
         returns (address)
     {
-        return CREATEX_FACTORY.createX{value: value}(asCreationType(creationType), initCode, salt);
+        return deployCreateX(creationType, initCode, salt, 0);
+    }
+
+    function deployCreateX(
+        ICreateXFactory.CreationType creationType,
+        bytes memory initCode,
+        bytes32 salt,
+        uint256 value
+    ) internal returns (address) {
+        return CREATEX_FACTORY.createX{value: value}(creationType, initCode, salt);
     }
 
     function deployCreate(bytes memory initCode) internal returns (address) {
@@ -107,11 +114,11 @@ contract CreateX is BaseScript {
 
     function deployTransparentProxy(address owner, address implementation, bytes memory data, uint256 value)
         internal
-        returns (address proxy, address proxyAdmin)
+        returns (address proxy)
     {
         bytes memory arguments = abi.encode(owner, implementation, data);
         bytes memory initCode = bytes.concat(TRANSPARENT_PROXY_BYTECODE, arguments);
-        proxyAdmin = CreateXLib.computeCreateAddress(proxy = deployCreate(initCode, value), 1);
+        return deployCreate(initCode, value);
     }
 
     function deployTransparentProxy(
@@ -120,15 +127,15 @@ contract CreateX is BaseScript {
         bytes memory data,
         bytes32 salt,
         uint256 value
-    ) internal returns (address proxy, address proxyAdmin) {
+    ) internal returns (address proxy) {
         bytes memory arguments = abi.encode(owner, implementation, data);
         bytes memory initCode = bytes.concat(TRANSPARENT_PROXY_BYTECODE, arguments);
-        proxyAdmin = CreateXLib.computeCreateAddress(proxy = deployCreate2(initCode, salt, value), 1);
+        return deployCreate2(initCode, salt, value);
     }
 
-    function promptCreationType() internal returns (uint256) {
+    function promptCreationType() internal returns (ICreateXFactory.CreationType) {
         string memory promptText = "CreationType (0: CREATE, 1: CREATE2, 2: CREATE3, 3: Clone, 4: CloneDeterministic)";
-        return vm.promptUint(promptText);
+        return asCreationType(vm.promptUint(promptText));
     }
 
     function asCreationType(uint256 creationType) internal pure returns (ICreateXFactory.CreationType) {
