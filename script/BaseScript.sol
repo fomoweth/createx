@@ -1,16 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
-import {Script, console2 as console, stdJson} from "forge-std/Script.sol";
-import {ICreateXFactory} from "src/ICreateXFactory.sol";
-import {VmSafe} from "forge-std/Vm.sol";
+import {Script} from "forge-std/Script.sol";
+import {Config} from "forge-std/Config.sol";
+import {stdJson} from "forge-std/StdJson.sol";
 
-abstract contract BaseScript is Script {
+abstract contract BaseScript is Script, Config {
     using stdJson for string;
 
     string private constant DEFAULT_MNEMONIC = "test test test test test test test test test test test junk";
-
-    string private constant DEFAULT_CHAINS = "ethereum, optimism, polygon, base, arbitrum";
 
     address internal broadcaster;
 
@@ -20,17 +18,18 @@ abstract contract BaseScript is Script {
         vm.stopBroadcast();
     }
 
-    modifier fork(string memory chainAlias) {
-        vm.createSelectFork(chainAlias);
+    modifier fork(uint256 chainId) {
+        vm.selectFork(forkOf[chainId]);
         _;
     }
 
     function setUp() public virtual {
+        _loadConfigAndForks("./config/deployments.toml", true);
         broadcaster = vm.rememberKey(configurePrivateKey());
     }
 
     function configurePrivateKey() internal view virtual returns (uint256 privateKey) {
-        privateKey = vm.envOr({
+        return vm.envOr({
             name: "PRIVATE_KEY",
             defaultValue: vm.deriveKey({
                 mnemonic: vm.envOr({name: "MNEMONIC", defaultValue: DEFAULT_MNEMONIC}),
@@ -41,26 +40,22 @@ abstract contract BaseScript is Script {
 
     function generateJson(string memory path, string memory name, address instance, bytes32 salt) internal virtual {
         string memory json = "json";
+        json.serialize("name", name);
         json.serialize("address", instance);
+        json.serialize("salt", salt);
         json.serialize("blockNumber", vm.getBlockNumber());
         json.serialize("timestamp", vm.getBlockTimestamp());
-        json.serialize("salt", salt);
-        json = json.serialize("name", name);
+        json = json.serialize("deployer", broadcaster);
         json.write(path);
-    }
-
-    function promptChains() internal virtual returns (string[] memory chainAliases) {
-        string memory input = prompt("Chains separated by ','", defaultChains());
-        return vm.split(vm.replace(input, " ", ""), ",");
-    }
-
-    function prompt(string memory promptText) internal returns (string memory input) {
-        return prompt(promptText, new string(0));
     }
 
     function prompt(string memory promptText, string memory defaultValue) internal returns (string memory input) {
         input = vm.prompt(string.concat(promptText, " (default: `", defaultValue, "`)"));
         if (bytes(input).length == 0) input = defaultValue;
+    }
+
+    function prompt(string memory promptText) internal returns (string memory input) {
+        return prompt(promptText, new string(0));
     }
 
     function promptAddress(string memory promptText, address defaultValue) internal returns (address) {
@@ -109,13 +104,5 @@ abstract contract BaseScript is Script {
 
     function promptBytes(string memory promptText) internal returns (bytes memory) {
         return promptBytes(promptText, new bytes(0));
-    }
-
-    function defaultChains() internal view virtual returns (string memory chains) {
-        return DEFAULT_CHAINS;
-    }
-
-    function defaultSalt() internal view virtual returns (bytes32) {
-        return bytes32(0);
     }
 }

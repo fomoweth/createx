@@ -1,5 +1,4 @@
 .github/
-foundry.toml
-out/
-lib/
 cache/
+lib/
+out/
