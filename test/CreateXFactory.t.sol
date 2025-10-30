@@ -2,12 +2,13 @@
 pragma solidity ^0.8.30;
 
 import {Test} from "forge-std/Test.sol";
+import {Config} from "forge-std/Config.sol";
 import {CreateXFactory, ICreateXFactory} from "src/CreateXFactory.sol";
 import {CreateX} from "src/CreateX.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
 import {MockTarget} from "test/mocks/MockTarget.sol";
 
-contract CreateXFactoryTest is Test {
+contract CreateXFactoryTest is Test, Config {
     uint256 internal snapshotId = type(uint256).max;
 
     CreateXFactory internal factory;
@@ -21,14 +22,14 @@ contract CreateXFactoryTest is Test {
     }
 
     function setUp() public {
-        factory = new CreateXFactory();
+        vm.makePersistent(address(factory = new CreateXFactory()));
     }
 
     function test_fuzz_createX(bool protected, address deployer, uint96 identifier, uint256 value)
         public
         impersonate(deployer, value)
     {
-        bytes memory initCode = abi.encodePacked(type(MockTarget).creationCode);
+        bytes memory initCode = type(MockTarget).creationCode;
         bytes32 initCodeHash = keccak256(initCode);
         bytes32 salt = generateSalt(deployer, identifier, protected);
 
@@ -71,8 +72,8 @@ contract CreateXFactoryTest is Test {
             predicted = factory.computeCreateAddress(vm.getNonce(address(factory))), deployer
         );
 
-        instance =
-            factory.createX{value: value}(ICreateXFactory.CreationType.Clone, abi.encodePacked(implementation), salt);
+        initCode = abi.encodePacked(implementation);
+        instance = factory.createX{value: value}(ICreateXFactory.CreationType.Clone, initCode, salt);
         assertEq(instance, predicted);
         assertEq(instance.balance, value);
         revertToState();
@@ -82,16 +83,12 @@ contract CreateXFactoryTest is Test {
             predicted = factory.computeCloneDeterministicAddress(implementation, salt), deployer, salt
         );
 
-        instance = factory.createX{value: value}(
-            ICreateXFactory.CreationType.CloneDeterministic, abi.encodePacked(implementation), salt
-        );
+        instance = factory.createX{value: value}(ICreateXFactory.CreationType.CloneDeterministic, initCode, salt);
         assertEq(instance, predicted);
         assertEq(instance.balance, value);
     }
 
-    function test_fuzz_computeCreateXAddress(bool protected, address deployer, uint96 identifier, bytes32 hash)
-        public
-    {
+    function test_fuzz_computeCreateXAddress(bool protected, address deployer, uint96 identifier, bytes32 hash) public {
         if (identifier >= type(uint64).max) {
             vm.expectRevert(CreateX.InvalidNonce.selector);
             factory.computeCreateXAddress(ICreateXFactory.CreationType.CREATE, hash, bytes32(uint256(identifier)));
@@ -130,7 +127,7 @@ contract CreateXFactoryTest is Test {
     }
 
     function test_fuzz_create(address deployer, uint256 value) public impersonate(deployer, value) {
-        bytes memory initCode = abi.encodePacked(type(MockTarget).creationCode);
+        bytes memory initCode = type(MockTarget).creationCode;
         address predicted = vm.computeCreateAddress(address(factory), vm.getNonce(address(factory)));
 
         vm.expectEmit(true, true, true, true);
@@ -161,7 +158,7 @@ contract CreateXFactoryTest is Test {
         public
         impersonate(deployer, value)
     {
-        bytes memory initCode = abi.encodePacked(type(MockTarget).creationCode);
+        bytes memory initCode = type(MockTarget).creationCode;
         bytes32 initCodeHash = keccak256(initCode);
         bytes32 salt = generateSalt(deployer, identifier, protected);
         address predicted = computeCreate2Address(address(factory), initCodeHash, salt);
@@ -196,7 +193,7 @@ contract CreateXFactoryTest is Test {
         public
         impersonate(deployer, value)
     {
-        bytes memory initCode = abi.encodePacked(type(MockTarget).creationCode);
+        bytes memory initCode = type(MockTarget).creationCode;
         bytes32 salt = generateSalt(deployer, identifier, protected);
         address predicted = computeCreate3Address(address(factory), salt);
 
@@ -226,47 +223,25 @@ contract CreateXFactoryTest is Test {
     }
 
     function test_create3_chainAgnosticDeployment() public {
-        vm.makePersistent(address(factory));
+        _loadConfigAndForks("./config.toml", false);
+
+        uint256[] memory chains = config.getChainIds();
+        assertGt(chains.length, 0);
 
         bytes memory initCode = bytes.concat(type(MockERC20).creationCode, abi.encode("Mock Token", "MOCK", 18));
         bytes32 salt = generateSalt(address(this));
 
-        vm.createSelectFork("ethereum");
+        vm.selectFork(forkOf[chains[0]]);
         address instance = factory.create3(initCode, salt);
 
-        vm.createSelectFork("optimism");
-        assertEq(instance, factory.create3(initCode, salt));
-
-        vm.createSelectFork("bnb");
-        assertEq(instance, factory.create3(initCode, salt));
-
-        vm.createSelectFork("polygon");
-        assertEq(instance, factory.create3(initCode, salt));
-
-        vm.createSelectFork("unichain");
-        assertEq(instance, factory.create3(initCode, salt));
-
-        vm.createSelectFork("fantom");
-        assertEq(instance, factory.create3(initCode, salt));
-
-        vm.createSelectFork("base");
-        assertEq(instance, factory.create3(initCode, salt));
-
-        vm.createSelectFork("arbitrum");
-        assertEq(instance, factory.create3(initCode, salt));
-
-        vm.createSelectFork("avalanche");
-        assertEq(instance, factory.create3(initCode, salt));
-
-        vm.createSelectFork("scroll");
-        assertEq(instance, factory.create3(initCode, salt));
-
-        vm.createSelectFork("linea");
-        assertEq(instance, factory.create3(initCode, salt));
+        for (uint256 i = 1; i < chains.length; ++i) {
+            vm.selectFork(forkOf[chains[i]]);
+            assertEq(instance, factory.create3(initCode, salt));
+        }
     }
 
     function test_create3_revertsOnSameSaltDeployments() public {
-        bytes memory mockInitCode = abi.encodePacked(type(MockTarget).creationCode);
+        bytes memory mockInitCode = type(MockTarget).creationCode;
         bytes memory erc20InitCode = bytes.concat(type(MockERC20).creationCode, abi.encode("Mock Token", "MOCK", 18));
         bytes32 salt = generateSalt(address(this));
 
@@ -381,7 +356,7 @@ contract CreateXFactoryTest is Test {
         return computeCreate2Address(deployer, initCodeHash, salt);
     }
 
-    function generateSalt(address caller) internal returns (bytes32 salt) {
+    function generateSalt(address caller) internal view returns (bytes32 salt) {
         return generateSalt(caller, uint96(vm.randomUint(type(uint96).min, type(uint96).max)));
     }
 
