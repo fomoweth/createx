@@ -12,7 +12,7 @@
 			}
 		},
 		{
-			"files": "*.json",
+			"files": ["*.json", "*.js", "*.ts"],
 			"options": {
 				"useTabs": true,
 				"bracketSpacing": true
