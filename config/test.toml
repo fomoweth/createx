@@ -1,0 +1,29 @@
+[mainnet]
+endpoint_url = "${MAINNET_RPC_URL}"
+
+[optimism]
+endpoint_url = "${OPTIMISM_RPC_URL}"
+
+[bsc]
+endpoint_url = "${BSC_RPC_URL}"
+
+[unichain]
+endpoint_url = "${UNICHAIN_RPC_URL}"
+
+[polygon]
+endpoint_url = "${POLYGON_RPC_URL}"
+
+[base]
+endpoint_url = "${BASE_RPC_URL}"
+
+[arbitrum]
+endpoint_url = "${ARBITRUM_RPC_URL}"
+
+[avalanche]
+endpoint_url = "${AVALANCHE_RPC_URL}"
+
+[linea]
+endpoint_url = "${LINEA_RPC_URL}"
+
+[scroll]
+endpoint_url = "${SCROLL_RPC_URL}"
